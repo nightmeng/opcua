@@ -215,7 +215,7 @@ impl ServerState {
                 // Test end point's security_policy_uri and matching url
                 url_matches_except_host(&e.endpoint_url(&base_endpoint_url), endpoint_url)
             })
-            .map(|(_, e)| self.new_endpoint_description(&config, e, false))
+            .map(|(_, e)| self.new_endpoint_description(&config, e, true))
             .collect();
         if endpoints.is_empty() {
             None
