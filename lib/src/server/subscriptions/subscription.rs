@@ -494,7 +494,8 @@ impl Subscription {
                 expected_sequence_number, notification.sequence_number
             );
         }
-        // debug!("Enqueuing notification {:?}", notification);
+
+        debug!("Enqueuing notification {:?}", notification);
         self.last_sequence_number = notification.sequence_number;
         self.notifications.push_back(notification);
     }
@@ -532,6 +533,7 @@ impl Subscription {
                 self.enqueue_notification(notification);
             }
             UpdateStateAction::ReturnNotifications => {
+                debug!("Sending a notification");
                 // Add the notification message to the queue
                 if let Some(notification) = notification {
                     self.enqueue_notification(notification);
@@ -566,6 +568,9 @@ impl Subscription {
         self.notifications.pop_front()
     }
 
+    pub fn notification_len(&self) -> usize {
+        self.notifications.len()
+    }
     // See OPC UA Part 4 5.13.1.2 State Table
     //
     // This function implements the main guts of updating the subscription's state according to
@@ -646,6 +651,8 @@ impl Subscription {
                 // DO NOTHING
             }
         }
+        debug!("publishing_enabled: {}, publishing_timer_expired: {}, notifications_available: {}, publishing_req_queued: {}, more_notifications: {}",
+            self.publishing_enabled, p.publishing_timer_expired, p.notifications_available, p.publishing_req_queued, p.more_notifications);
 
         match self.state {
             SubscriptionState::Creating => {
@@ -666,6 +673,14 @@ impl Subscription {
                         || (self.publishing_enabled && !p.more_notifications))
                 {
                     // State #4
+                    if self.publishing_enabled && !p.more_notifications {
+                        trace!("--> State 4 (My)");
+                        if p.notifications_available {
+                            return UpdateStateResult::new(HandledState::Normal4, UpdateStateAction::ReturnNotifications);
+                        }
+                        return UpdateStateResult::new(HandledState::Normal4, UpdateStateAction::ReturnKeepAlive);
+                    }
+                    trace!("--> State 4 (My)");
                     return UpdateStateResult::new(HandledState::Normal4, UpdateStateAction::None);
                 } else if tick_reason == TickReason::ReceivePublishRequest
                     && self.publishing_enabled
@@ -762,6 +777,27 @@ impl Subscription {
                 } else if p.publishing_timer_expired {
                     // State #12
                     self.start_publishing_timer();
+                    // If there are requests in publish request queue, we should
+                    // not return a state 'None', because we should flush publish
+                    // message as soon as possible.
+                    if self.publishing_enabled && p.publishing_req_queued {
+                        // If there are notifications in its queue, we should
+                        // return a state 'Notification' to flush both publish
+                        // requests and notifications.
+                        if p.notifications_available || p.more_notifications {
+                            return UpdateStateResult::new(
+                                HandledState::Late12,
+                                UpdateStateAction::ReturnNotifications,
+                            );
+                        }
+                        // If there is no notification, we return a state 'KeepAlive'
+                        // to flush publish request to client.
+                        return UpdateStateResult::new(
+                            HandledState::Late12,
+                            UpdateStateAction::ReturnKeepAlive,
+                        );
+                    }
+
                     return UpdateStateResult::new(HandledState::Late12, UpdateStateAction::None);
                 }
             }
@@ -805,6 +841,14 @@ impl Subscription {
                     // State #16
                     self.start_publishing_timer();
                     self.keep_alive_counter -= 1;
+                    // If there are requests in publish request queue, we return a keep
+                    // alive state to flush publish request to client.
+                    if self.publishing_enabled && p.publishing_req_queued {
+                        return UpdateStateResult::new(
+                            HandledState::KeepAlive16,
+                            UpdateStateAction::ReturnKeepAlive,
+                        );
+                    }
                     return UpdateStateResult::new(
                         HandledState::KeepAlive16,
                         UpdateStateAction::None,

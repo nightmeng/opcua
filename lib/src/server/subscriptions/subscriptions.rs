@@ -235,6 +235,7 @@ impl Subscriptions {
 
             // Process any notifications
             loop {
+                trace!("publish request queue length: {}, notification queue length: {}", self.publish_request_queue.len(), subscription.notification_len());
                 if !self.publish_request_queue.is_empty() {
                     if let Some(notification_message) = subscription.take_notification() {
                         let publish_request = self.publish_request_queue.pop_back().unwrap();
@@ -250,7 +251,9 @@ impl Subscriptions {
                 } else {
                     break;
                 }
+                trace!("publish request queue length: {}, notification queue length: {}", self.publish_request_queue.len(), subscription.notification_len());
             }
+            trace!("publish request queue length: {}, notification queue length: {}", self.publish_request_queue.len(), subscription.notification_len());
 
             // Remove the subscription if it is done
             if subscription.ready_to_remove() {
