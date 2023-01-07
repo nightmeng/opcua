@@ -900,6 +900,12 @@ impl Subscription {
                         HandledState::KeepAlive17,
                         UpdateStateAction::None,
                     );
+                } else if force_publish {
+                    // force publish request to client
+                    return UpdateStateResult::new(
+                        HandledState::KeepAlive15,
+                        UpdateStateAction::ReturnKeepAlive,
+                    );
                 }
             }
             _ => {
