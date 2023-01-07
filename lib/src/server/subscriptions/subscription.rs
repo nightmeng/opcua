@@ -654,8 +654,8 @@ impl Subscription {
                 // DO NOTHING
             }
         }
-        debug!("publishing_enabled: {}, publishing_timer_expired: {}, notifications_available: {}, publishing_req_queued: {}, more_notifications: {}",
-            self.publishing_enabled, p.publishing_timer_expired, p.notifications_available, p.publishing_req_queued, p.more_notifications);
+        debug!("publishing_enabled: {}, publishing_timer_expired: {}, notifications_available: {}, publishing_req_queued: {}, more_notifications: {}, force_publish: {}",
+            self.publishing_enabled, p.publishing_timer_expired, p.notifications_available, p.publishing_req_queued, p.more_notifications, force_publish);
 
         match self.state {
             SubscriptionState::Creating => {
