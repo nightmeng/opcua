@@ -234,6 +234,7 @@ impl Subscriptions {
                 let request_timestamp: DateTimeUtc = request_header.timestamp.into();
 
                 if now.signed_duration_since(request_timestamp) > time::Duration::milliseconds(3000) {
+                    debug!("[DEBUG] publish request: {} publish at {}", request_header.request_handle, request_timestamp);
                     force_publish = true;
                 }
                 return true;
