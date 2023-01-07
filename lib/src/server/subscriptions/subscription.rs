@@ -472,6 +472,7 @@ impl Subscription {
                     more_notifications,
                     publishing_timer_expired: publishing_interval_elapsed,
                 },
+                force_publish,
             );
             trace!(
                 "subscription tick - update_state_result = {:?}",
