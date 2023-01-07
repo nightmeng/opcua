@@ -423,6 +423,7 @@ impl Subscription {
         address_space: &AddressSpace,
         tick_reason: TickReason,
         publishing_req_queued: bool,
+        force_publish: bool,
     ) {
         // Check if the publishing interval has elapsed. Only checks on the tick timer.
         let publishing_interval_elapsed = match tick_reason {
@@ -597,6 +598,7 @@ impl Subscription {
         &mut self,
         tick_reason: TickReason,
         p: SubscriptionStateParams,
+        force_publish: bool,
     ) -> UpdateStateResult {
         // This function is called when a publish request is received OR the timer expired, so getting
         // both is invalid code somewhere
@@ -673,14 +675,23 @@ impl Subscription {
                         || (self.publishing_enabled && !p.more_notifications))
                 {
                     // State #4
+                    // If there are requests in publish request queue, we should not return action 'None',
+                    // we should try to flush the current publish requests.
                     if self.publishing_enabled && !p.more_notifications {
-                        trace!("--> State 4 (My)");
+                        // Flush both publish requests and notifications
                         if p.notifications_available {
                             return UpdateStateResult::new(HandledState::Normal4, UpdateStateAction::ReturnNotifications);
                         }
+
+                        // Flush publish request only
                         return UpdateStateResult::new(HandledState::Normal4, UpdateStateAction::ReturnKeepAlive);
                     }
-                    trace!("--> State 4 (My)");
+
+                    if force_publish {
+                        // Force flush publish request
+                        return UpdateStateResult::new(HandledState::Normal4, UpdateStateAction::ReturnKeepAlive);
+                    }
+
                     return UpdateStateResult::new(HandledState::Normal4, UpdateStateAction::None);
                 } else if tick_reason == TickReason::ReceivePublishRequest
                     && self.publishing_enabled
@@ -741,6 +752,12 @@ impl Subscription {
                     self.start_publishing_timer();
                     self.reset_keep_alive_counter();
                     self.state = SubscriptionState::KeepAlive;
+
+                    if force_publish || self.publishing_enabled {
+                        // flush publish request
+                        return UpdateStateResult::new(HandledState::IntervalElapsed9, UpdateStateAction::ReturnKeepAlive);
+                    }
+
                     return UpdateStateResult::new(
                         HandledState::IntervalElapsed9,
                         UpdateStateAction::None,
@@ -798,12 +815,21 @@ impl Subscription {
                         );
                     }
 
+                    if force_publish {
+                        // flush publish request
+                        return UpdateStateResult::new(HandledState::Late12, UpdateStateAction::ReturnKeepAlive);
+                    }
+
                     return UpdateStateResult::new(HandledState::Late12, UpdateStateAction::None);
                 }
             }
             SubscriptionState::KeepAlive => {
                 if tick_reason == TickReason::ReceivePublishRequest {
                     // State #13
+                    if force_publish {
+                        // flush publish request
+                        return UpdateStateResult::new(HandledState::KeepAlive13, UpdateStateAction::ReturnKeepAlive);
+                    }
                     return UpdateStateResult::new(
                         HandledState::KeepAlive13,
                         UpdateStateAction::None,
@@ -849,6 +875,12 @@ impl Subscription {
                             UpdateStateAction::ReturnKeepAlive,
                         );
                     }
+
+                    if force_publish {
+                        // flush publish request
+                        return UpdateStateResult::new(HandledState::KeepAlive16, UpdateStateAction::ReturnKeepAlive);
+                    }
+
                     return UpdateStateResult::new(
                         HandledState::KeepAlive16,
                         UpdateStateAction::None,
