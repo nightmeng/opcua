@@ -334,12 +334,6 @@ impl Subscriptions {
             // The request has timed out if the timestamp plus hint exceeds the input time
             if now.signed_duration_since(request_timestamp) > publish_request_timeout {
                 debug!("Publish request {} has expired - timestamp = {:?}, expiration hint = {}, publish timeout = {:?}, time now = {:?}, ", request_header.request_handle, request_timestamp, request_timestamp, publish_request_timeout, now);
-                expired_publish_responses.push_front(PublishResponseEntry {
-                    request_id: request.request_id,
-                    response: ServiceFault {
-                        response_header: ResponseHeader::new_timestamped_service_result(DateTime::now(), &request.request.request_header, StatusCode::BadTimeout),
-                    }.into(),
-                });
                 false
             } else {
                 true
