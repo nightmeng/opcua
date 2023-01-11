@@ -228,10 +228,21 @@ impl Subscriptions {
             let publishing_req_queued = !self.publish_request_queue.is_empty();
             let subscription = self.subscriptions.get_mut(&subscription_id).unwrap();
 
+            let mut force_publish = false;
+            self.publish_request_queue.retain(|request| {
+                let request_header = &request.request.request_header;
+                let request_timestamp: DateTimeUtc = request_header.timestamp.into();
+
+                if now.signed_duration_since(request_timestamp) > time::Duration::milliseconds(3000) {
+                    debug!("[DEBUG] publish request: {} publish at {}", request_header.request_handle, request_timestamp);
+                    force_publish = true;
+                }
+                return true;
+            });
             // Now tick the subscription to see if it has any notifications. If there are
             // notifications then the publish response will be associated with his subscription
             // and ready to go.
-            subscription.tick(now, address_space, tick_reason, publishing_req_queued);
+            subscription.tick(now, address_space, tick_reason, publishing_req_queued, force_publish);
 
             // Process any notifications
             loop {
